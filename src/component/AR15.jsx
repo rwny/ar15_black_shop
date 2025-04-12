@@ -56,7 +56,7 @@ function getBoundingBox(object) {
 
 function AR15({ onObjectClick = () => {} }) {
    console.log('AR15.jsx loaded')
-   const ar15 = useGLTF('./models/glb/ar15_x10.glb')
+   const ar15 = useGLTF('./models/glb/ar15_x11.glb')
    const modelRef = useRef();
    const [selectedObject, setSelectedObject] = useState(null);
    // Store original materials for future use

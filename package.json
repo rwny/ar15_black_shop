@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "clean-start": "node clean-start.js"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "4.3",
