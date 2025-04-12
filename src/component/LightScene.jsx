@@ -1,11 +1,12 @@
 import { OrbitControls } from '@react-three/drei'
 import { Perf } from 'r3f-perf'
 
-export default function LightScene()
-{
+export default function LightScene() {
+
     console.log('Experience.jsx loaded')
     const shadowArea = 100
     const shadowMapSize = 2048 * 4
+
     return <>
 
         <Perf position="top-left" />
@@ -16,7 +17,7 @@ export default function LightScene()
             position={ [ 20, 40, 30 ] } 
             intensity={ 4 } 
             castShadow 
-            // shadow-normalBias={ 0.01 }
+            shadow-normalBias={ 0.01 }
             shadow-bias={ -0.001 }
 
             shadow-camera-far={100}
