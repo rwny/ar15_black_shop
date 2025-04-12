@@ -15,9 +15,9 @@ function App() {
   return (
     <div className="app-container">
       <div className="canvas-container">
-        <Canvas shadows camera={{ position: [3, 2, 3], fov: 50 }}>
+        <Canvas shadows camera={{ position: [-25,10,25], fov: 50 }}>
           <color attach="background" args={["#f5f5f5"]} />
-          <Stage environment="city" intensity={0.5}>
+          <Stage environment="city" intensity={0.5} adjustCamera={false}>
             <AR15 onObjectClick={handleObjectClick} />
           </Stage>
           <OrbitControls makeDefault />

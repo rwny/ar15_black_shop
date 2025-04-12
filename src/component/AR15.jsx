@@ -58,53 +58,50 @@ function AR15({ onObjectClick = () => {} }) {
    console.log('AR15.jsx loaded')
    const ar15 = useGLTF('./models/glb/ar15_x10.glb')
    const modelRef = useRef();
-   const [modelDimensions, setModelDimensions] = useState(null);
    const [selectedObject, setSelectedObject] = useState(null);
+   
+   // Light blue highlight color for selected objects
+   const HIGHLIGHT_COLOR = new THREE.Color(0x0000ff);
    
    useEffect(() => {
      if (modelRef.current) {
-       const { size, positionAdjustment } = getBoundingBox(modelRef.current);
-       
-       // Apply position adjustment to center-bottom the model
-       modelRef.current.position.set(
-         positionAdjustment.x,
-         positionAdjustment.y,
-         positionAdjustment.z
-       );
-       
-       setModelDimensions({
-         width: size.x,
-         height: size.y,
-         depth: size.z
-       });
-       
-       console.log("Model dimensions:", size);
-       console.log("Position adjustment:", positionAdjustment);
-       
-       // Make each part of the model selectable
+       // Set all materials to be double-sided
        modelRef.current.traverse((child) => {
-         if (child.isMesh) {
+         if (child.isMesh && child.material) {
+           // Handle both single material and material array cases
+           if (Array.isArray(child.material)) {
+             child.material = child.material.map(mat => {
+               const clonedMat = mat.clone();
+               clonedMat.side = THREE.DoubleSide;
+               clonedMat.needsUpdate = true;
+               return clonedMat;
+             });
+           } else {
+             child.material = child.material.clone();
+             child.material.side = THREE.DoubleSide;
+             child.material.needsUpdate = true;
+           }
+           
+           // Enable shadows
+           child.castShadow = true;
+           child.receiveShadow = true;
+           
            // Make sure each mesh has a name
            if (!child.name) {
              child.name = `Part_${Math.random().toString(36).substr(2, 9)}`;
            }
            
-           // Ensure geometry has a bounding box
-           if (!child.geometry.boundingBox) {
-             child.geometry.computeBoundingBox();
-           }
-           
-           // Store original material color
-           child.userData.originalColor = child.material.color.clone();
-           
            // Make clickable
            child.userData.selectable = true;
          }
        });
+       
+       console.log("All materials set to double-sided");
      }
    }, [ar15.scene]);
    
    const handleClick = (event) => {
+     // Stop propagation to prevent multiple objects from being selected
      event.stopPropagation();
      
      // If click didn't hit a mesh, do nothing
@@ -121,17 +118,27 @@ function AR15({ onObjectClick = () => {} }) {
        }
      }
      
+     // If clicking on the same object, deselect it
+     if (selectedObject === event.object) {
+       setSelectedObject(null);
+       onObjectClick(null);
+       return;
+     }
+     
      // Select new object
      setSelectedObject(event.object);
      
-     // Highlight selected object
+     // Highlight only the selected object with light blue
      if (Array.isArray(event.object.material)) {
        event.object.material.forEach(mat => {
-         mat.emissive = new THREE.Color(0x555555);
+         mat.emissive = HIGHLIGHT_COLOR;
        });
      } else {
-       event.object.material.emissive = new THREE.Color(0x555555);
+       event.object.material.emissive = HIGHLIGHT_COLOR;
      }
+     
+     // Here we're not doing any camera manipulation
+     // The zooming behavior is likely controlled elsewhere
      
      // Prepare object info for sidebar
      const boundingBox = event.object.geometry.boundingBox;
