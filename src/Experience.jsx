@@ -8,6 +8,7 @@ import Fox from './Fox.jsx'
 
 export default function Experience()
 {
+    console.log('Experience.jsx loaded')
     return <>
 
         <Perf position="top-left" />
