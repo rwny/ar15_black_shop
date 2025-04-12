@@ -63,7 +63,7 @@ function AR15({ onObjectClick = () => {} }) {
    const [originalGlbMaterials, setOriginalGlbMaterials] = useState({});
    
    // Highlight color for selected objects (bright red)
-   const HIGHLIGHT_COLOR = new THREE.Color(0xff0000);
+   const HIGHLIGHT_COLOR = new THREE.Color(0xffa07a);
    
    // Function to deeply inspect an object
    const inspectObject = (obj, depth = 0, maxDepth = 3) => {
