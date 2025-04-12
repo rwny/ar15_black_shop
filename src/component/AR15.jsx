@@ -1,7 +1,7 @@
 function AR15() {
    return(
       <mesh>
-         <icosahedronGeometry args={[1, 1]} />
+         <torusKnotGeometry/>
          <meshStandardMaterial color="orange" />
       </mesh>
    )
