@@ -54,11 +54,12 @@ function getBoundingBox(object) {
   };
 }
 
-function AR15() {
+function AR15({ onObjectClick = () => {} }) {
    console.log('AR15.jsx loaded')
    const ar15 = useGLTF('./models/glb/ar15_x10.glb')
    const modelRef = useRef();
    const [modelDimensions, setModelDimensions] = useState(null);
+   const [selectedObject, setSelectedObject] = useState(null);
    
    useEffect(() => {
      if (modelRef.current) {
@@ -79,10 +80,80 @@ function AR15() {
        
        console.log("Model dimensions:", size);
        console.log("Position adjustment:", positionAdjustment);
+       
+       // Make each part of the model selectable
+       modelRef.current.traverse((child) => {
+         if (child.isMesh) {
+           // Make sure each mesh has a name
+           if (!child.name) {
+             child.name = `Part_${Math.random().toString(36).substr(2, 9)}`;
+           }
+           
+           // Ensure geometry has a bounding box
+           if (!child.geometry.boundingBox) {
+             child.geometry.computeBoundingBox();
+           }
+           
+           // Store original material color
+           child.userData.originalColor = child.material.color.clone();
+           
+           // Make clickable
+           child.userData.selectable = true;
+         }
+       });
      }
    }, [ar15.scene]);
    
-   console.log(ar15)
+   const handleClick = (event) => {
+     event.stopPropagation();
+     
+     // If click didn't hit a mesh, do nothing
+     if (!event.object || !event.object.isMesh) return;
+     
+     // Reset previous selection if any
+     if (selectedObject) {
+       if (Array.isArray(selectedObject.material)) {
+         selectedObject.material.forEach(mat => {
+           mat.emissive = new THREE.Color(0x000000);
+         });
+       } else {
+         selectedObject.material.emissive = new THREE.Color(0x000000);
+       }
+     }
+     
+     // Select new object
+     setSelectedObject(event.object);
+     
+     // Highlight selected object
+     if (Array.isArray(event.object.material)) {
+       event.object.material.forEach(mat => {
+         mat.emissive = new THREE.Color(0x555555);
+       });
+     } else {
+       event.object.material.emissive = new THREE.Color(0x555555);
+     }
+     
+     // Prepare object info for sidebar
+     const boundingBox = event.object.geometry.boundingBox;
+     const dimensions = boundingBox ? {
+       width: boundingBox.max.x - boundingBox.min.x,
+       height: boundingBox.max.y - boundingBox.min.y,
+       depth: boundingBox.max.z - boundingBox.min.z
+     } : { width: 'N/A', height: 'N/A', depth: 'N/A' };
+     
+     // Send data to sidebar
+     onObjectClick({
+       name: event.object.name,
+       type: event.object.type,
+       position: [
+         event.object.position.x.toFixed(2),
+         event.object.position.y.toFixed(2),
+         event.object.position.z.toFixed(2)
+       ],
+       dimensions
+     });
+   };
+   
    return(
       <>
          <primitive 
@@ -90,6 +161,7 @@ function AR15() {
             object={ar15.scene} 
             scale={1} 
             position={[0, 0, 0]} 
+            onClick={handleClick}
          />
 
          {/* <Box /> */}
