@@ -59,32 +59,105 @@ function AR15({ onObjectClick = () => {} }) {
    const ar15 = useGLTF('./models/glb/ar15_x10.glb')
    const modelRef = useRef();
    const [selectedObject, setSelectedObject] = useState(null);
+   // Store original materials for future use
+   const [originalGlbMaterials, setOriginalGlbMaterials] = useState({});
    
-   // Light blue highlight color for selected objects
-   const HIGHLIGHT_COLOR = new THREE.Color(0x0000ff);
+   // Highlight color for selected objects (bright red)
+   const HIGHLIGHT_COLOR = new THREE.Color(0xff0000);
+   
+   // Function to deeply inspect an object
+   const inspectObject = (obj, depth = 0, maxDepth = 3) => {
+     if (depth > maxDepth) return "Max depth reached";
+     
+     const result = {};
+     
+     // Skip certain properties that cause circular references
+     const skipProps = ['parent', 'children', 'geometry', 'material'];
+     
+     for (let key in obj) {
+       if (!obj.hasOwnProperty(key)) continue;
+       if (skipProps.includes(key)) continue;
+       if (key.startsWith('_')) continue;
+       
+       const value = obj[key];
+       
+       if (value === null || value === undefined) {
+         result[key] = value;
+       }
+       else if (typeof value === 'function') {
+         result[key] = 'function';
+       }
+       else if (typeof value === 'object') {
+         if (value instanceof THREE.Vector3) {
+           result[key] = `Vector3(${value.x}, ${value.y}, ${value.z})`;
+         }
+         else if (value instanceof THREE.Color) {
+           result[key] = `Color(${value.r}, ${value.g}, ${value.b})`;
+         }
+         else if (value instanceof THREE.Quaternion) {
+           result[key] = `Quaternion(${value.x}, ${value.y}, ${value.z}, ${value.w})`;
+         }
+         else if (depth < maxDepth) {
+           result[key] = inspectObject(value, depth + 1, maxDepth);
+         }
+         else {
+           result[key] = "Object...";
+         }
+       }
+       else {
+         result[key] = value;
+       }
+     }
+     
+     return result;
+   };
    
    useEffect(() => {
      if (modelRef.current) {
        // Set all materials to be double-sided
+       const materialsMap = {};
+       
        modelRef.current.traverse((child) => {
          if (child.isMesh && child.material) {
+           // Store original materials before modifying them
+           if (Array.isArray(child.material)) {
+             materialsMap[child.uuid] = child.material.map(mat => {
+               const clone = mat.clone();
+               // Store the original color in the material's userData
+               clone.userData = {...clone.userData, originalColor: clone.color.clone()};
+               return clone;
+             });
+           } else {
+             const clone = child.material.clone();
+             // Store the original color in the material's userData
+             clone.userData = {...clone.userData, originalColor: clone.color.clone()};
+             materialsMap[child.uuid] = clone;
+           }
+           
            // Handle both single material and material array cases
            if (Array.isArray(child.material)) {
              child.material = child.material.map(mat => {
                const clonedMat = mat.clone();
                clonedMat.side = THREE.DoubleSide;
+               clonedMat.shadowSide = THREE.BackSide; // Improve shadow quality
                clonedMat.needsUpdate = true;
                return clonedMat;
              });
            } else {
              child.material = child.material.clone();
              child.material.side = THREE.DoubleSide;
+             child.material.shadowSide = THREE.BackSide; // Improve shadow quality
              child.material.needsUpdate = true;
            }
            
-           // Enable shadows
+           // Enable shadows with higher quality settings
            child.castShadow = true;
            child.receiveShadow = true;
+           
+           // Improve shadow map quality for this object
+           if (child.geometry) {
+             child.geometry.computeVertexNormals(); // Ensure normals are correct for lighting
+           }
            
            // Make sure each mesh has a name
            if (!child.name) {
@@ -96,7 +169,33 @@ function AR15({ onObjectClick = () => {} }) {
          }
        });
        
+       // Store the original materials
+       setOriginalGlbMaterials(materialsMap);
+       console.log("Original materials stored:", materialsMap);
        console.log("All materials set to double-sided");
+       
+       // Log the full model structure and search for IFC data
+       console.log("Full GLB model structure:", modelRef.current);
+       console.log("Searching for IFC data...");
+       
+       // Look for IFC properties in userData or custom properties
+       let ifcDataFound = false;
+       modelRef.current.traverse((node) => {
+         if (node.userData && Object.keys(node.userData).length > 0) {
+           // Check for IFC data in userData
+           if (node.userData.ifcData || 
+               node.userData.IFC || 
+               node.userData.properties || 
+               node.name.includes('IFC')) {
+             console.log(`IFC data found in node: ${node.name}`, inspectObject(node.userData));
+             ifcDataFound = true;
+           }
+         }
+       });
+       
+       if (!ifcDataFound) {
+         console.log("No explicit IFC data found in the model");
+       }
      }
    }, [ar15.scene]);
    
@@ -107,14 +206,42 @@ function AR15({ onObjectClick = () => {} }) {
      // If click didn't hit a mesh, do nothing
      if (!event.object || !event.object.isMesh) return;
      
+     // Log detailed information about clicked object
+     console.log("Clicked object:", event.object);
+     console.log("Object name:", event.object.name);
+     console.log("Object type:", event.object.type);
+     console.log("Object UUID:", event.object.uuid);
+     
+     // Inspect for IFC data in the clicked object
+     console.log("Object userData:", inspectObject(event.object.userData));
+     console.log("Full object inspection:", inspectObject(event.object));
+     
+     // Check parent hierarchy for IFC information
+     let parent = event.object.parent;
+     let depth = 0;
+     console.log("Checking parent hierarchy for IFC data:");
+     while (parent && depth < 5) {
+       console.log(`Level ${depth} parent:`, parent.name, inspectObject(parent.userData));
+       parent = parent.parent;
+       depth++;
+     }
+     
      // Reset previous selection if any
      if (selectedObject) {
        if (Array.isArray(selectedObject.material)) {
          selectedObject.material.forEach(mat => {
-           mat.emissive = new THREE.Color(0x000000);
+           // Restore original color instead of using emissive
+           if (mat.userData && mat.userData.originalColor) {
+             mat.color.copy(mat.userData.originalColor);
+           }
+           mat.needsUpdate = true;
          });
        } else {
-         selectedObject.material.emissive = new THREE.Color(0x000000);
+         // Restore original color instead of using emissive
+         if (selectedObject.material.userData && selectedObject.material.userData.originalColor) {
+           selectedObject.material.color.copy(selectedObject.material.userData.originalColor);
+         }
+         selectedObject.material.needsUpdate = true;
        }
      }
      
@@ -128,13 +255,25 @@ function AR15({ onObjectClick = () => {} }) {
      // Select new object
      setSelectedObject(event.object);
      
-     // Highlight only the selected object with light blue
+     // Highlight selected object by changing its color (not emissive)
      if (Array.isArray(event.object.material)) {
        event.object.material.forEach(mat => {
-         mat.emissive = HIGHLIGHT_COLOR;
+         // Store original color if not already stored
+         if (!mat.userData) mat.userData = {};
+         if (!mat.userData.originalColor) {
+           mat.userData.originalColor = mat.color.clone();
+         }
+         mat.color.set(HIGHLIGHT_COLOR);
+         mat.needsUpdate = true;
        });
      } else {
-       event.object.material.emissive = HIGHLIGHT_COLOR;
+       // Store original color if not already stored
+       if (!event.object.material.userData) event.object.material.userData = {};
+       if (!event.object.material.userData.originalColor) {
+         event.object.material.userData.originalColor = event.object.material.color.clone();
+       }
+       event.object.material.color.set(HIGHLIGHT_COLOR);
+       event.object.material.needsUpdate = true;
      }
      
      // Here we're not doing any camera manipulation
@@ -169,6 +308,8 @@ function AR15({ onObjectClick = () => {} }) {
             scale={1} 
             position={[0, 0, 0]} 
             onClick={handleClick}
+            castShadow={true}
+            receiveShadow={true}
          />
 
          {/* <Box /> */}
