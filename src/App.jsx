@@ -29,7 +29,7 @@ function App() {
          }}
          >
 
-          <color attach="background" args={["steelblue"]} />
+          <color attach="background" args={["skyblue"]} />
 
           <ambientLight intensity={0.4} />
           
@@ -38,30 +38,29 @@ function App() {
             intensity={0.5} 
             adjustCamera={false}
             preset="rembrandt"
-            // Disable Stage's built-in shadows to avoid conflicts
-            // contactShadow={false}  
-            // shadows={false}  
+            contactShadow={false}
+            shadows={false}
           >
             <AR15 onObjectClick={handleObjectClick} />
           </Stage>
           
           {/* Restore the contact shadows with better settings */}
           <ContactShadows 
-            position={[0, -0.001, 0]}  // Just barely below the floor
+            position={[0, -0.001, 0]}  
             opacity={0.5}             
             scale={40} 
             blur={3}                 
             far={3}                  
-            resolution={512}          // Higher resolution for better quality
-            color="#000000"           // Pure black shadows
-            frames={1}                // Static shadows (no animation)
+            resolution={512}          
+            color="#000000"           
+            frames={1}                
           />
           
           {/* Check if there are any clipping planes being applied */}
           <OrbitControls 
             makeDefault
             minPolarAngle={Math.PI/10}
-            maxPolarAngle={Math.PI*0.75}
+            maxPolarAngle={Math.PI/1.88}
             enableZoom={true}
             zoomSpeed={1.2}
             enablePan={true}

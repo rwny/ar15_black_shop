@@ -3,6 +3,7 @@ import { useGLTF } from "@react-three/drei";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { inspectObject, extractIFCInformation } from "../utils/objectUtils";
+import { addGridsToFloors } from "../utils/gridUtils";
 
 function AR15({ onObjectClick = () => {} }) {
    console.log('AR15.jsx loaded')
@@ -11,8 +12,18 @@ function AR15({ onObjectClick = () => {} }) {
    const [selectedObject, setSelectedObject] = useState(null);
    
    // Define material colors
-   const DEFAULT_COLOR = new THREE.Color(0xf0ffff);  // Green default color
+   const DEFAULT_COLOR = new THREE.Color(0xf8f8ff);  // White default color
    const HIGHLIGHT_COLOR = new THREE.Color(0xffa07a); // Highlight color (salmon)
+   
+   // Define special colors for specific object types
+   const SPECIAL_COLORS = {
+     'IfcSlab': new THREE.Color(0x778899), // Dark gray for slabs
+     'IfcBeam': DEFAULT_COLOR,     // Brown for beams
+     'IfcColumn': DEFAULT_COLOR,   // Dim gray for columns
+     'IfcWall': DEFAULT_COLOR,     // Light gray for walls
+     'IfcDoor': DEFAULT_COLOR,     // Dark red for doors
+     'IfcWindow': DEFAULT_COLOR,   // Light blue for windows
+   };
    
    // Store original materials for future use
    const [originalMaterials, setOriginalMaterials] = useState({});
@@ -31,18 +42,28 @@ function AR15({ onObjectClick = () => {} }) {
              origMaterials[child.uuid] = child.material.clone();
            }
            
-           // 2. Create new default material
+           // 2. Create new default material based on object name/type
+           let objectColor = DEFAULT_COLOR.clone();
+           
+           // Check for specific IFC type in the name
+           Object.keys(SPECIAL_COLORS).forEach(key => {
+             if (child.name.includes(key)) {
+               objectColor = SPECIAL_COLORS[key].clone();
+               console.log(`Applied special color to ${child.name}`);
+             }
+           });
+           
            if (Array.isArray(child.material)) {
              child.material = child.material.map(mat => {
                const newMat = mat.clone();
-               newMat.color = DEFAULT_COLOR.clone();
+               newMat.color = objectColor;
                newMat.side = THREE.DoubleSide;
                newMat.needsUpdate = true;
                return newMat;
              });
            } else {
              child.material = child.material.clone();
-             child.material.color = DEFAULT_COLOR.clone();
+             child.material.color = objectColor;
              child.material.side = THREE.DoubleSide;
              child.material.needsUpdate = true;
            }
@@ -56,18 +77,28 @@ function AR15({ onObjectClick = () => {} }) {
              child.name = `Part_${Math.random().toString(36).substr(2, 9)}`;
            }
            
-           // Make clickable
-           child.userData.selectable = true;
+           // Make objects clickable or non-clickable based on their type
+           if (child.name.includes('IfcSlab')) {
+             // Make IfcSlab objects unclickable
+             child.userData.selectable = false;
+           } else {
+             // Make other objects clickable
+             child.userData.selectable = true;
+           }
          }
+       });
+       
+       // Add grid helpers to all floor/slab objects
+       addGridsToFloors(modelRef.current, {
+         color: 0x708090,
+         secondaryColor: 0x708090,
+         divisions: 2,
+         offset: -0.01
        });
        
        // Store original materials
        setOriginalMaterials(origMaterials);
        console.log("Original materials stored:", origMaterials);
-       
-       // Log the full model structure and search for IFC data
-       console.log("Full GLB model structure:", modelRef.current);
-       console.log("Searching for IFC data...");
        
        // Look for IFC properties in userData or custom properties
        let ifcDataFound = false;
@@ -97,6 +128,12 @@ function AR15({ onObjectClick = () => {} }) {
      // If click didn't hit a mesh, do nothing
      if (!event.object || !event.object.isMesh) return;
      
+     // Check if the object is clickable/selectable
+     if (event.object.userData.selectable === false) {
+       console.log("Object is not selectable:", event.object.name);
+       return;
+     }
+     
      console.log("====== CLICKED OBJECT ANALYSIS ======");
      
      // Log detailed information about clicked object
@@ -124,15 +161,24 @@ function AR15({ onObjectClick = () => {} }) {
        depth++;
      }
      
-     // Reset previous selection if any (restore default color)
+     // Reset previous selection if any (restore appropriate color)
      if (selectedObject) {
+       let resetColor = DEFAULT_COLOR.clone();
+       
+       // Check if this is a special object type that needs its own color
+       Object.keys(SPECIAL_COLORS).forEach(key => {
+         if (selectedObject.name.includes(key)) {
+           resetColor = SPECIAL_COLORS[key].clone();
+         }
+       });
+       
        if (Array.isArray(selectedObject.material)) {
          selectedObject.material.forEach(mat => {
-           mat.color.copy(DEFAULT_COLOR);
+           mat.color.copy(resetColor);
            mat.needsUpdate = true;
          });
        } else {
-         selectedObject.material.color.copy(DEFAULT_COLOR);
+         selectedObject.material.color.copy(resetColor);
          selectedObject.material.needsUpdate = true;
        }
      }
@@ -219,4 +265,5 @@ function AR15({ onObjectClick = () => {} }) {
       </>
    )
 }
+
 export default AR15;
