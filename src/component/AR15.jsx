@@ -1,10 +1,9 @@
 // load ar12 glb model or ifc
-
 import { useGLTF } from "@react-three/drei";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-
+// cnsole
 // Function to calculate the bounding box and center the model
 function getBoundingBox(object) {
   const boundingBox = new THREE.Box3().setFromObject(object);
