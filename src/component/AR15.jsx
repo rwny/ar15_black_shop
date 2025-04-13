@@ -4,14 +4,6 @@ import { useGLTF } from "@react-three/drei";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-function Box() {
-   return (
-      <mesh>
-         <boxGeometry args={[1, 1, 1]} />
-         <meshStandardMaterial color="orange" />
-      </mesh>
-   )
-}
 
 // Function to calculate the bounding box and center the model
 function getBoundingBox(object) {
