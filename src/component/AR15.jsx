@@ -10,60 +10,48 @@ function AR15({ onObjectClick = () => {} }) {
    const modelRef = useRef();
    const [selectedObject, setSelectedObject] = useState(null);
    
-   // Store original materials for future use
-   const [originalGlbMaterials, setOriginalGlbMaterials] = useState({});
+   // Define material colors
+   const DEFAULT_COLOR = new THREE.Color(0xf0ffff);  // Green default color
+   const HIGHLIGHT_COLOR = new THREE.Color(0xffa07a); // Highlight color (salmon)
    
-   // Highlight color for selected objects (bright red)
-   const HIGHLIGHT_COLOR = new THREE.Color(0xffa07a);
+   // Store original materials for future use
+   const [originalMaterials, setOriginalMaterials] = useState({});
    
    useEffect(() => {
      if (modelRef.current) {
-       // Set all materials to be double-sided
-       const materialsMap = {};
+       // 1. Store original materials
+       const origMaterials = {};
        
        modelRef.current.traverse((child) => {
          if (child.isMesh && child.material) {
-           // Store original materials before modifying them
+           // Save reference to original material
            if (Array.isArray(child.material)) {
-             materialsMap[child.uuid] = child.material.map(mat => {
-               const clone = mat.clone();
-               // Store the original color in the material's userData
-               clone.userData = {...clone.userData, originalColor: clone.color.clone()};
-               return clone;
-             });
+             origMaterials[child.uuid] = child.material.map(mat => mat.clone());
            } else {
-             const clone = child.material.clone();
-             // Store the original color in the material's userData
-             clone.userData = {...clone.userData, originalColor: clone.color.clone()};
-             materialsMap[child.uuid] = clone;
+             origMaterials[child.uuid] = child.material.clone();
            }
            
-           // Handle both single material and material array cases
+           // 2. Create new default material
            if (Array.isArray(child.material)) {
              child.material = child.material.map(mat => {
-               const clonedMat = mat.clone();
-               clonedMat.side = THREE.DoubleSide;
-               clonedMat.shadowSide = THREE.BackSide; // Improve shadow quality
-               clonedMat.needsUpdate = true;
-               return clonedMat;
+               const newMat = mat.clone();
+               newMat.color = DEFAULT_COLOR.clone();
+               newMat.side = THREE.DoubleSide;
+               newMat.needsUpdate = true;
+               return newMat;
              });
            } else {
              child.material = child.material.clone();
+             child.material.color = DEFAULT_COLOR.clone();
              child.material.side = THREE.DoubleSide;
-             child.material.shadowSide = THREE.BackSide; // Improve shadow quality
              child.material.needsUpdate = true;
            }
            
-           // Enable shadows with higher quality settings
+           // Enable shadows
            child.castShadow = true;
            child.receiveShadow = true;
            
-           // Improve shadow map quality for this object
-           if (child.geometry) {
-             child.geometry.computeVertexNormals(); // Ensure normals are correct for lighting
-           }
-           
-           // Make sure each mesh has a name
+           // Set name if needed
            if (!child.name) {
              child.name = `Part_${Math.random().toString(36).substr(2, 9)}`;
            }
@@ -73,10 +61,9 @@ function AR15({ onObjectClick = () => {} }) {
          }
        });
        
-       // Store the original materials
-       setOriginalGlbMaterials(materialsMap);
-       console.log("Original materials stored:", materialsMap);
-       console.log("All materials set to double-sided");
+       // Store original materials
+       setOriginalMaterials(origMaterials);
+       console.log("Original materials stored:", origMaterials);
        
        // Log the full model structure and search for IFC data
        console.log("Full GLB model structure:", modelRef.current);
@@ -118,9 +105,6 @@ function AR15({ onObjectClick = () => {} }) {
      console.log("Object type:", event.object.type);
      console.log("Object UUID:", event.object.uuid);
      
-     // Deep search for IFC metadata in the object name or userData
-     // Now using the imported extractIFCInformation function
-     
      // Extract IFC info from clicked object
      const ifcInfo = extractIFCInformation(event.object);
      console.log("Extracted IFC information:", ifcInfo);
@@ -131,7 +115,7 @@ function AR15({ onObjectClick = () => {} }) {
      let depth = 0;
      let fullHierarchyData = [];
      
-     while (parent && depth < 5) {
+     while (parent && depth < 1) {
        console.log(`Level ${depth} parent:`, parent.name);
        const parentIfcInfo = extractIFCInformation(parent);
        console.log(`Parent IFC Info: `, parentIfcInfo);
@@ -139,61 +123,16 @@ function AR15({ onObjectClick = () => {} }) {
        parent = parent.parent;
        depth++;
      }
-
-     // Search through property scene graph for IFC type data (like BeamType)
-     console.log("====== SEARCHING THE ENTIRE SCENE FOR IFC BEAM TYPE ======");
-     let ifcBeamTypeFound = false;
-     ar15.scenes.forEach(scene => {
-       scene.traverse(node => {
-         if (node.name && (node.name.includes("BeamType") || node.name.includes("BR 200x600"))) {
-           console.log("Found IFC Beam Type node:", node);
-           ifcBeamTypeFound = true;
-           if (node.userData) {
-             console.log("IFC Beam Type userData:", inspectObject(node.userData));
-           }
-         }
-       });
-     });
      
-     if (!ifcBeamTypeFound) {
-       console.log("No explicit IFC BeamType found in scene traversal");
-       
-       // Try searching in raw parsed data
-       console.log("Looking in raw GLB data");
-       if (ar15.parser && ar15.parser.json) {
-         const searchForBeamTypeInJson = (obj, path = "") => {
-           if (typeof obj !== "object" || obj === null) return;
-           
-           // Check if this object has a name property containing BeamType
-           if (obj.name && (obj.name.includes("BeamType") || obj.name.includes("BR 200x600"))) {
-             console.log(`Found BeamType reference at path ${path}:`, obj);
-           }
-           
-           // Recurse into object properties
-           Object.keys(obj).forEach(key => {
-             searchForBeamTypeInJson(obj[key], `${path}.${key}`);
-           });
-         };
-         
-         searchForBeamTypeInJson(ar15.parser.json, "parser.json");
-       }
-     }
-     
-     // Reset previous selection if any
+     // Reset previous selection if any (restore default color)
      if (selectedObject) {
        if (Array.isArray(selectedObject.material)) {
          selectedObject.material.forEach(mat => {
-           // Restore original color instead of using emissive
-           if (mat.userData && mat.userData.originalColor) {
-             mat.color.copy(mat.userData.originalColor);
-           }
+           mat.color.copy(DEFAULT_COLOR);
            mat.needsUpdate = true;
          });
        } else {
-         // Restore original color instead of using emissive
-         if (selectedObject.material.userData && selectedObject.material.userData.originalColor) {
-           selectedObject.material.color.copy(selectedObject.material.userData.originalColor);
-         }
+         selectedObject.material.color.copy(DEFAULT_COLOR);
          selectedObject.material.needsUpdate = true;
        }
      }
@@ -208,29 +147,16 @@ function AR15({ onObjectClick = () => {} }) {
      // Select new object
      setSelectedObject(event.object);
      
-     // Highlight selected object by changing its color (not emissive)
+     // 3. Apply highlight material to selected object
      if (Array.isArray(event.object.material)) {
        event.object.material.forEach(mat => {
-         // Store original color if not already stored
-         if (!mat.userData) mat.userData = {};
-         if (!mat.userData.originalColor) {
-           mat.userData.originalColor = mat.color.clone();
-         }
-         mat.color.set(HIGHLIGHT_COLOR);
+         mat.color.copy(HIGHLIGHT_COLOR);
          mat.needsUpdate = true;
        });
      } else {
-       // Store original color if not already stored
-       if (!event.object.material.userData) event.object.material.userData = {};
-       if (!event.object.material.userData.originalColor) {
-         event.object.material.userData.originalColor = event.object.material.color.clone();
-       }
-       event.object.material.color.set(HIGHLIGHT_COLOR);
+       event.object.material.color.copy(HIGHLIGHT_COLOR);
        event.object.material.needsUpdate = true;
      }
-     
-     // Here we're not doing any camera manipulation
-     // The zooming behavior is likely controlled elsewhere
      
      // Prepare object info for sidebar
      const boundingBox = event.object.geometry.boundingBox;
@@ -290,8 +216,6 @@ function AR15({ onObjectClick = () => {} }) {
             castShadow={true}
             receiveShadow={true}
          />
-
-         {/* <Box /> */}
       </>
    )
 }
