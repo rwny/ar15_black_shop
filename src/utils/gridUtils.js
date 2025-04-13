@@ -1,5 +1,5 @@
 import * as THREE from "three";
-
+// 02
 /**
  * Creates a grid helper positioned on a floor/slab mesh
  * @param {THREE.Mesh} floorMesh - The floor/slab mesh to place grid on
