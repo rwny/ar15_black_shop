@@ -28,7 +28,7 @@ body, html {
 
 /* Sidebar styles */
 .sidebar {
-  width: 250px;
+  width: 300px;
   height: 100%;
   background-color: #f8f9fa;
   border-left: 1px solid #dee2e6;
@@ -73,4 +73,69 @@ body, html {
 /* Canvas positioning */
 canvas {
   display: block;
+}
+
+/* Hierarchy tree styles */
+.hierarchy-tree {
+  margin-top: 5px;
+  border-left: 2px solid #dee2e6;
+  padding-left: 5px;
+}
+
+.hierarchy-level {
+  padding: 3px 0;
+  position: relative;
+}
+
+.hierarchy-level::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 50%;
+  width: 5px;
+  height: 1px;
+  background-color: #dee2e6;
+}
+
+.hierarchy-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hierarchy-name {
+  font-weight: 500;
+}
+
+.hierarchy-type {
+  font-size: 0.8em;
+  color: #6c757d;
+}
+
+/* IFC data styles */
+.ifc-properties {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 10px;
+  margin-top: 5px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ifc-property {
+  display: flex;
+  margin-bottom: 5px;
+  font-family: monospace;
+}
+
+.ifc-key {
+  font-weight: bold;
+  margin-right: 5px;
+  color: #007bff;
+}
+
+.ifc-value {
+  white-space: pre-wrap;
+  word-break: break-all;
 }
