@@ -1,5 +1,5 @@
 import * as THREE from "three";
-//01
+//010
 /**
  * Deeply inspects an object and converts it to a serializable format,
  * handling THREE.js objects and preventing circular references
