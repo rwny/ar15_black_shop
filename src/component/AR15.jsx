@@ -2,106 +2,19 @@
 import { useGLTF } from "@react-three/drei";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-
-// cnsole
-// Function to calculate the bounding box and center the model
-function getBoundingBox(object) {
-  const boundingBox = new THREE.Box3().setFromObject(object);
-  const size = new THREE.Vector3();
-  boundingBox.getSize(size);
-  const center = new THREE.Vector3();
-  boundingBox.getCenter(center);
-  
-  // Calculate position adjustment to place the bottom-center at origin
-  const positionAdjustment = new THREE.Vector3(
-    -center.x,
-    -boundingBox.min.y, // This will align the bottom to y=0
-    -center.z
-  );
-  
-  // Set all materials to be double-sided
-  object.traverse((child) => {
-    if (child.isMesh && child.material) {
-      // Handle both single material and material array cases
-      if (Array.isArray(child.material)) {
-        child.material.forEach(material => {
-          material.side = THREE.DoubleSide;
-        });
-      } else {
-        child.material.side = THREE.DoubleSide;
-      }
-      
-      // Enable shadows
-      child.castShadow = true;
-      child.receiveShadow = true;
-    }
-  });
-  
-  return {
-    boundingBox,
-    size,
-    center,
-    positionAdjustment
-  };
-}
+import { inspectObject, extractIFCInformation } from "../utils/objectUtils";
 
 function AR15({ onObjectClick = () => {} }) {
    console.log('AR15.jsx loaded')
    const ar15 = useGLTF('./models/glb/ar15_x12.glb')
    const modelRef = useRef();
    const [selectedObject, setSelectedObject] = useState(null);
+   
    // Store original materials for future use
    const [originalGlbMaterials, setOriginalGlbMaterials] = useState({});
    
    // Highlight color for selected objects (bright red)
    const HIGHLIGHT_COLOR = new THREE.Color(0xffa07a);
-   
-   // Function to deeply inspect an object
-   const inspectObject = (obj, depth = 0, maxDepth = 3) => {
-     if (depth > maxDepth) return "Max depth reached";
-     
-     const result = {};
-     
-     // Skip certain properties that cause circular references
-     const skipProps = ['parent', 'children', 'geometry', 'material'];
-     
-     for (let key in obj) {
-       if (!obj.hasOwnProperty(key)) continue;
-       if (skipProps.includes(key)) continue;
-       if (key.startsWith('_')) continue;
-       
-       const value = obj[key];
-       
-       if (value === null || value === undefined) {
-         result[key] = value;
-       }
-       else if (typeof value === 'function') {
-         result[key] = 'function';
-       }
-       else if (typeof value === 'object') {
-         if (value instanceof THREE.Vector3) {
-           result[key] = `Vector3(${value.x}, ${value.y}, ${value.z})`;
-         }
-         else if (value instanceof THREE.Color) {
-           result[key] = `Color(${value.r}, ${value.g}, ${value.b})`;
-         }
-         else if (value instanceof THREE.Quaternion) {
-           result[key] = `Quaternion(${value.x}, ${value.y}, ${value.z}, ${value.w})`;
-         }
-         else if (depth < maxDepth) {
-           result[key] = inspectObject(value, depth + 1, maxDepth);
-         }
-         else {
-           result[key] = "Object...";
-         }
-       }
-       else {
-         result[key] = value;
-       }
-     }
-     
-     return result;
-   };
    
    useEffect(() => {
      if (modelRef.current) {
@@ -206,38 +119,7 @@ function AR15({ onObjectClick = () => {} }) {
      console.log("Object UUID:", event.object.uuid);
      
      // Deep search for IFC metadata in the object name or userData
-     const extractIFCInformation = (obj) => {
-       const ifcInfo = {
-         name: obj.name,
-         type: null,
-         dimensions: null,
-         properties: {}
-       };
-       
-       // Check if name contains IFC type information
-       const nameMatch = obj.name.match(/Ifc(\w+)/);
-       if (nameMatch) {
-         ifcInfo.type = nameMatch[0]; // Store the IFC type from name
-       }
-       
-       // Look for dimensions in name (common format like 200x600)
-       const dimensionMatch = obj.name.match(/(\d+)x(\d+)/);
-       if (dimensionMatch) {
-         ifcInfo.dimensions = {
-           width: parseInt(dimensionMatch[1]),
-           height: parseInt(dimensionMatch[2])
-         };
-       }
-       
-       // Check userData for properties
-       if (obj.userData) {
-         if (obj.userData.ifcData) ifcInfo.properties = obj.userData.ifcData;
-         if (obj.userData.IFC) ifcInfo.properties = obj.userData.IFC;
-         if (obj.userData.properties) ifcInfo.properties = obj.userData.properties;
-       }
-       
-       return ifcInfo;
-     };
+     // Now using the imported extractIFCInformation function
      
      // Extract IFC info from clicked object
      const ifcInfo = extractIFCInformation(event.object);
